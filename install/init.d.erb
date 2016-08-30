@@ -1,0 +1,81 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          RPirrigate
+# Required-Start:    $local_fs $network $named $time $syslog
+# Required-Stop:     $local_fs $network $named $time $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Description:       RPirrigate daemon
+### END INIT INFO
+
+SCRIPT1='python /srv/rpirrigate/daemon/RPirrigate-maind.py'
+RUNAS1=www-data
+
+SCRIPT2='python /srv/rpirrigate/daemon/RPirrigate-gpiod.py'
+RUNAS2=root
+
+PIDFILE1=/var/run/rpirrigate-maind.pid
+PIDFILE2=/var/run/rpirrigate-gpiod.pid
+
+start() {
+  mkdir -p /var/log/rpirrigate
+  chown -R $RUNAS1:$RUNAS1 /var/log/rpirrigate
+  chmod -R 775 /var/log/rpirrigate
+  
+  if [ -f /var/run/$PIDNAME1 ] && kill -0 $(cat /var/run/$PIDNAME1); then
+    echo 'Service 1 already running' >&2
+    return 1
+  else
+    echo 'Starting service 1' >&2
+    local CMD1="$SCRIPT1 & echo \$!"
+    su -c "$CMD1" $RUNAS1 > "$PIDFILE1"
+  fi
+
+  if [ -f /var/run/$PIDNAME2 ] && kill -0 $(cat /var/run/$PIDNAME2); then
+    echo 'Service 2 already running' >&2
+    return 1
+  else
+    echo 'Starting service 2' >&2
+    local CMD2="$SCRIPT2 & echo \$!"
+    su -c "$CMD2" $RUNAS2 > "$PIDFILE2"
+  fi
+
+
+}
+
+stop() {
+  local PID1=$(cat "$PIDFILE1")
+  if [ ! -f "$PIDFILE1" ] || ! kill -0 "$PID1"; then
+    echo 'Service 1 not running' >&2
+  else
+    echo 'Stopping service 1' >&2
+    kill -15 "$PID1" && rm -f "$PIDFILE1"
+    echo 'Service 1 stopped' >&2
+  fi
+
+  local PID2=$(cat "$PIDFILE2")
+  if [ ! -f "$PIDFILE2" ] || ! kill -0 "$PID2"; then
+    echo 'Service 2 not running' >&2
+    KILL2=0
+  else
+    echo 'Stopping service 2' >&2
+    kill -15 "$PID2" && rm -f "$PIDFILE2"
+    echo 'Service 2 stopped' >&2
+
+  fi
+}
+
+case "$1" in
+  start)
+    start
+    ;;
+  stop)
+    stop
+    ;;
+  restart)
+    stop
+    start
+    ;;
+  *)
+    echo "Usage: $0 {start|stop|restart|uninstall}"
+esac
